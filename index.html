@@ -11,7 +11,8 @@
     <div class="header-left">
       <h1 class="logo">MOVIEFLIX</h1>
       <nav class="nav-links">
-        <a href="#" class="nav-link active">홈</a>
+        <a href="#" class="nav-link active" data-view="home">홈</a>
+        <a href="#" class="nav-link" data-view="mylist">내 목록</a>
       </nav>
     </div>
     <div class="header-right">
@@ -62,6 +63,12 @@
       <div class="grid" id="searchResultsGrid"></div>
       <p class="empty-message" id="searchEmptyMessage" hidden>검색 결과가 없습니다.</p>
     </section>
+
+    <section id="myListSection" class="search-results" hidden>
+      <h3 class="row-title">내 목록</h3>
+      <div class="grid" id="myListGrid"></div>
+      <p class="empty-message" id="myListEmptyMessage" hidden>담은 영화가 없습니다. 포스터의 + 버튼을 눌러 추가해보세요.</p>
+    </section>
   </main>
 
   <footer class="footer">
@@ -81,6 +88,9 @@
           <span class="modal-release" id="modalRelease"></span>
           <span class="modal-runtime" id="modalRuntime"></span>
         </div>
+        <div class="modal-actions">
+          <button class="btn btn-watchlist" id="modalWatchlistBtn">+ 내 목록에 추가</button>
+        </div>
         <div class="modal-genres" id="modalGenres"></div>
         <p class="modal-overview" id="modalOverview"></p>
         <div class="modal-trailer" id="modalTrailer"></div>
@@ -92,6 +102,8 @@
     <div class="spinner"></div>
   </div>
 
-  <script src="script.js"></script>
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script type="module" src="script.js"></script>
 </body>
 </html>

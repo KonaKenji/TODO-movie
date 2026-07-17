@@ -1,3 +1,27 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+  serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCSO0aFMHjzgYykc4qn9zLhoscIdOChOTc",
+  authDomain: "todo-movie-3e68c.firebaseapp.com",
+  projectId: "todo-movie-3e68c",
+  storageBucket: "todo-movie-3e68c.firebasestorage.app",
+  messagingSenderId: "37689283560",
+  appId: "1:37689283560:web:90dbce65ffd90ad9920a5d",
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const watchlistCollectionRef = collection(db, "watchlist");
+
 const CONFIG = {
   API_KEY:
     "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmMjkzZTBiMDVkYzZhN2VjMzQ1NjMyOTVlNTlhZjM0YiIsIm5iZiI6MTc4NDI5MDMwOC45NzUwMDAxLCJzdWIiOiI2YTVhMWMwNDkzMGYwODJjNzJmMzdlNGUiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.ijIxJvK4ahc-w6WmxKNoRbNqvnAmWeCDyLYugDx9Xe8",
@@ -34,16 +58,24 @@ async function fetchFromTMDB(path, params = {}) {
   return response.json();
 }
 
+/* ---------- Toast / error feedback ---------- */
+
+const toastContainer = document.getElementById("toastContainer");
+
+function showToast(message, type = "success") {
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
+}
+
 function showError(message) {
-  const existing = document.querySelector(".error-banner");
-  if (existing) existing.remove();
+  showToast(message, "error");
+}
 
-  const banner = document.createElement("div");
-  banner.className = "error-banner";
-  banner.textContent = message;
-  document.body.appendChild(banner);
-
-  setTimeout(() => banner.remove(), 5000);
+function showSuccess(message) {
+  showToast(message, "success");
 }
 
 function setLoading(isLoading) {
@@ -51,29 +83,108 @@ function setLoading(isLoading) {
   overlay.classList.toggle("hidden", !isLoading);
 }
 
+function escapeHtml(str = "") {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* ---------- Watchlist (Firestore) ---------- */
+
+const watchlistMap = new Map();
+
+function isInWatchlist(id) {
+  return watchlistMap.has(String(id));
+}
+
+async function toggleWatchlist(movie) {
+  const id = String(movie.id);
+  const ref = doc(watchlistCollectionRef, id);
+
+  try {
+    if (isInWatchlist(id)) {
+      await deleteDoc(ref);
+      showSuccess(`"${movie.title}"을 내 목록에서 제거했습니다.`);
+    } else {
+      await setDoc(ref, {
+        id: movie.id,
+        title: movie.title || "",
+        poster_path: movie.poster_path || null,
+        backdrop_path: movie.backdrop_path || null,
+        vote_average: movie.vote_average ?? null,
+        release_date: movie.release_date || null,
+        addedAt: serverTimestamp(),
+      });
+      showSuccess(`"${movie.title}"을 내 목록에 추가했습니다.`);
+    }
+  } catch (err) {
+    console.error(err);
+    showError("내 목록 업데이트에 실패했습니다. Firestore 보안 규칙을 확인해주세요.");
+  }
+}
+
+function refreshWatchlistButtons() {
+  document.querySelectorAll(".watchlist-toggle").forEach((btn) => {
+    const active = isInWatchlist(btn.dataset.movieId);
+    btn.classList.toggle("active", active);
+    btn.textContent = active ? "✓" : "+";
+    btn.setAttribute("aria-label", active ? "내 목록에서 제거" : "내 목록에 추가");
+  });
+
+  if (currentModalMovie) {
+    const active = isInWatchlist(currentModalMovie.id);
+    modalWatchlistBtn.classList.toggle("active", active);
+    modalWatchlistBtn.textContent = active ? "✓ 내 목록에서 제거" : "+ 내 목록에 추가";
+  }
+}
+
+function subscribeWatchlist() {
+  onSnapshot(
+    watchlistCollectionRef,
+    (snapshot) => {
+      watchlistMap.clear();
+      snapshot.forEach((docSnap) => {
+        watchlistMap.set(docSnap.id, { id: Number(docSnap.id), ...docSnap.data() });
+      });
+      refreshWatchlistButtons();
+      if (currentView === "mylist") renderMyList();
+    },
+    (err) => {
+      console.error(err);
+      showError("내 목록을 불러오지 못했습니다. Firestore 설정을 확인해주세요.");
+    }
+  );
+}
+
+/* ---------- Movie cards ---------- */
+
 function createMovieCard(movie) {
   const card = document.createElement("div");
   card.className = "movie-card";
   card.dataset.movieId = movie.id;
 
   const rating = movie.vote_average ? movie.vote_average.toFixed(1) : "N/A";
+  const active = isInWatchlist(movie.id);
+  const safeTitle = escapeHtml(movie.title);
 
   card.innerHTML = `
-    <img src="${posterUrl(movie.poster_path)}" alt="${escapeHtml(movie.title)}" loading="lazy" />
+    <button class="watchlist-toggle${active ? " active" : ""}" type="button" data-movie-id="${movie.id}" aria-label="${
+    active ? "내 목록에서 제거" : "내 목록에 추가"
+  }">${active ? "✓" : "+"}</button>
+    <img src="${posterUrl(movie.poster_path)}" alt="${safeTitle}" loading="lazy" />
     <div class="movie-card-info">
-      <p class="movie-card-title">${escapeHtml(movie.title)}</p>
+      <p class="movie-card-title">${safeTitle}</p>
       <p class="movie-card-rating">★ ${rating}</p>
     </div>
   `;
 
+  card.querySelector(".watchlist-toggle").addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleWatchlist(movie);
+  });
+
   card.addEventListener("click", () => openMovieModal(movie.id));
   return card;
-}
-
-function escapeHtml(str = "") {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
 }
 
 function renderRow(containerId, movies) {
@@ -109,6 +220,8 @@ document.getElementById("heroDetailBtn").addEventListener("click", () => {
 
 const modalOverlay = document.getElementById("modalOverlay");
 const modalCloseBtn = document.getElementById("modalClose");
+const modalWatchlistBtn = document.getElementById("modalWatchlistBtn");
+let currentModalMovie = null;
 
 function formatRuntime(minutes) {
   if (!minutes) return "";
@@ -121,6 +234,9 @@ async function openMovieModal(movieId) {
   modalOverlay.hidden = false;
   document.body.style.overflow = "hidden";
 
+  currentModalMovie = null;
+  modalWatchlistBtn.disabled = true;
+  modalWatchlistBtn.textContent = "...";
   document.getElementById("modalTitle").textContent = "불러오는 중...";
   document.getElementById("modalOverview").textContent = "";
   document.getElementById("modalRating").textContent = "";
@@ -166,9 +282,21 @@ async function openMovieModal(movieId) {
     } else {
       trailerEl.innerHTML = `<p class="modal-trailer-empty">예고편 영상이 없습니다.</p>`;
     }
+
+    currentModalMovie = {
+      id: details.id,
+      title: details.title,
+      poster_path: details.poster_path,
+      backdrop_path: details.backdrop_path,
+      vote_average: details.vote_average,
+      release_date: details.release_date,
+    };
+    modalWatchlistBtn.disabled = false;
+    refreshWatchlistButtons();
   } catch (err) {
     console.error(err);
     document.getElementById("modalTitle").textContent = "정보를 불러올 수 없습니다.";
+    modalWatchlistBtn.textContent = "+ 내 목록에 추가";
     showError("영화 상세정보를 불러오는 중 오류가 발생했습니다.");
   }
 }
@@ -178,6 +306,10 @@ function closeModal() {
   document.body.style.overflow = "";
 }
 
+modalWatchlistBtn.addEventListener("click", () => {
+  if (currentModalMovie) toggleWatchlist(currentModalMovie);
+});
+
 modalCloseBtn.addEventListener("click", closeModal);
 modalOverlay.addEventListener("click", (e) => {
   if (e.target === modalOverlay) closeModal();
@@ -186,30 +318,65 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !modalOverlay.hidden) closeModal();
 });
 
+/* ---------- View switching (home / search / my list) ---------- */
+
+const rowsContainer = document.getElementById("rowsContainer");
+const heroSection = document.getElementById("hero");
+const searchResultsSection = document.getElementById("searchResults");
+const myListSection = document.getElementById("myListSection");
+const myListGrid = document.getElementById("myListGrid");
+const myListEmptyMessage = document.getElementById("myListEmptyMessage");
+const navLinks = document.querySelectorAll(".nav-link");
+
+let currentView = "home";
+
+function setView(view) {
+  currentView = view;
+  heroSection.hidden = view !== "home";
+  rowsContainer.hidden = view !== "home";
+  searchResultsSection.hidden = view !== "search";
+  myListSection.hidden = view !== "mylist";
+
+  navLinks.forEach((link) => {
+    const isActive = link.dataset.view === view || (view === "search" && link.dataset.view === "home");
+    link.classList.toggle("active", isActive);
+  });
+
+  if (view === "mylist") renderMyList();
+}
+
+function renderMyList() {
+  myListGrid.innerHTML = "";
+  const movies = Array.from(watchlistMap.values()).sort((a, b) => {
+    const at = a.addedAt?.seconds || 0;
+    const bt = b.addedAt?.seconds || 0;
+    return bt - at;
+  });
+
+  myListEmptyMessage.hidden = movies.length > 0;
+  movies.forEach((movie) => myListGrid.appendChild(createMovieCard(movie)));
+}
+
+navLinks.forEach((link) => {
+  link.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (link.dataset.view === "home") {
+      searchInput.value = "";
+      searchClearBtn.hidden = true;
+    }
+    setView(link.dataset.view);
+  });
+});
+
 /* ---------- Search ---------- */
 
 const searchInput = document.getElementById("searchInput");
 const searchClearBtn = document.getElementById("searchClear");
-const searchResultsSection = document.getElementById("searchResults");
 const searchResultsGrid = document.getElementById("searchResultsGrid");
 const searchResultsTitle = document.getElementById("searchResultsTitle");
 const searchEmptyMessage = document.getElementById("searchEmptyMessage");
-const rowsContainer = document.getElementById("rowsContainer");
-const heroSection = document.getElementById("hero");
 
 let searchDebounceTimer = null;
-
-function showBrowseView() {
-  searchResultsSection.hidden = true;
-  rowsContainer.hidden = false;
-  heroSection.hidden = false;
-}
-
-function showSearchView() {
-  searchResultsSection.hidden = false;
-  rowsContainer.hidden = true;
-  heroSection.hidden = true;
-}
 
 async function performSearch(query) {
   try {
@@ -236,12 +403,12 @@ searchInput.addEventListener("input", () => {
   clearTimeout(searchDebounceTimer);
 
   if (!query) {
-    showBrowseView();
+    setView("home");
     return;
   }
 
   searchDebounceTimer = setTimeout(() => {
-    showSearchView();
+    setView("search");
     performSearch(query);
   }, 400);
 });
@@ -249,7 +416,7 @@ searchInput.addEventListener("input", () => {
 searchClearBtn.addEventListener("click", () => {
   searchInput.value = "";
   searchClearBtn.hidden = true;
-  showBrowseView();
+  setView("home");
   searchInput.focus();
 });
 
@@ -257,6 +424,8 @@ searchClearBtn.addEventListener("click", () => {
 
 async function init() {
   setLoading(true);
+  subscribeWatchlist();
+
   try {
     const [nowPlaying, popular, topRated, upcoming] = await Promise.all([
       fetchFromTMDB("/movie/now_playing"),

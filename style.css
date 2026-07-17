@@ -261,6 +261,36 @@ html, body {
   padding: 8px 10px;
 }
 
+.watchlist-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  background: rgba(20, 20, 20, 0.75);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.watchlist-toggle:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.1);
+}
+
+.watchlist-toggle.active {
+  background: var(--red);
+  border-color: var(--red);
+}
+
 .movie-card-title {
   font-size: 0.82rem;
   font-weight: 600;
@@ -390,6 +420,26 @@ html, body {
   font-weight: 700;
 }
 
+.modal-actions {
+  margin-bottom: 16px;
+}
+
+.btn-watchlist {
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+}
+
+.btn-watchlist:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-watchlist.active {
+  background: var(--red);
+  border-color: var(--red);
+}
+
 .modal-genres {
   display: flex;
   gap: 8px;
@@ -467,6 +517,48 @@ html, body {
   z-index: 500;
   font-size: 0.9rem;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.toast {
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  animation: toast-in 0.2s ease;
+}
+
+.toast.success {
+  border-color: #46d369;
+}
+
+.toast.error {
+  border-color: var(--red);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ---------- Responsive ---------- */
